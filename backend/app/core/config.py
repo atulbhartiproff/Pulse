@@ -8,6 +8,7 @@ from pydantic import (
     EmailStr,
     HttpUrl,
     PostgresDsn,
+    SecretStr,
     computed_field,
     model_validator,
 )
@@ -35,6 +36,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+
+    SPOTIFY_CLIENT_ID: str | None = None
+    SPOTIFY_CLIENT_SECRET: SecretStr | None = None
+    SPOTIFY_REDIRECT_URI: HttpUrl | None = None
+    SPOTIFY_OAUTH_STATE_EXPIRE_MINUTES: int = 10
+    SPOTIFY_TOKEN_REFRESH_LEEWAY_SECONDS: int = 300
+    SPOTIFY_SYNC_INTERVAL_HOURS: int = 6
+    REDIS_URL: str = "redis://redis:6379/0"
 
     BACKEND_CORS_ORIGINS: Annotated[
         list[AnyUrl] | str, BeforeValidator(parse_cors)
