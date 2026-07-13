@@ -5,10 +5,10 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
-
+from app.services.spotify_history import spotify_history_sync_service
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
-from app.models import Message, SpotifyConnectionStatus, User
+from app.models import Message, SpotifyConnectionStatus, SpotifyAuthorizeUrl, User
 from app.services.spotify import SpotifyOAuthError, spotify_oauth
 
 router = APIRouter(prefix="/spotify", tags=["spotify"])
@@ -19,11 +19,12 @@ def settings_redirect(result: str) -> RedirectResponse:
     return RedirectResponse(url=f"{settings.FRONTEND_HOST}/settings?{query}")
 
 
-@router.get("/authorize")
-def authorize_spotify(current_user: CurrentUser) -> RedirectResponse:
-    """Redirect an authenticated Pulse user to Spotify's consent screen."""
+@router.get("/authorize", response_model=SpotifyAuthorizeUrl)
+def authorize_spotify(current_user: CurrentUser) -> SpotifyAuthorizeUrl:
+    """Get Spotify's consent screen authorization URL for the user."""
     try:
-        return RedirectResponse(url=spotify_oauth.authorization_url(current_user.id))
+        url = spotify_oauth.authorization_url(current_user.id)
+        return SpotifyAuthorizeUrl(success=True, authorization_url=url)
     except SpotifyOAuthError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -105,3 +106,21 @@ def disconnect_spotify(
     session.add(current_user)
     session.commit()
     return Message(message="Spotify disconnected successfully")
+
+
+
+@router.post("/sync")
+def sync_spotify(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    imported = spotify_history_sync_service.sync_user(
+        session=session,
+        user=current_user,
+    )
+
+    return {
+        "success": True,
+        "tracks_imported": imported,
+        "last_sync": current_user.last_sync,
+    }

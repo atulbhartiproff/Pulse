@@ -32,7 +32,7 @@ def mocked_fetch_current_user(_: str) -> SpotifyProfile:
     return SpotifyProfile(id="spotify-user-123")
 
 
-def test_authorize_spotify_redirects_to_consent_screen(
+def test_authorize_spotify_returns_url(
     client: TestClient,
     normal_user_token_headers: dict[str, str],
     monkeypatch: MonkeyPatch,
@@ -42,14 +42,16 @@ def test_authorize_spotify_redirects_to_consent_screen(
     response = client.get(
         f"{settings.API_V1_STR}/spotify/authorize",
         headers=normal_user_token_headers,
-        follow_redirects=False,
     )
 
-    assert response.status_code == 307
-    query = parse_qs(urlparse(response.headers["location"]).query)
-    assert response.headers["location"].startswith(
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    authorization_url = data["authorization_url"]
+    assert authorization_url.startswith(
         "https://accounts.spotify.com/authorize?"
     )
+    query = parse_qs(urlparse(authorization_url).query)
     assert query["client_id"] == ["spotify-client-id"]
     assert query["response_type"] == ["code"]
     assert query["scope"] == ["user-read-recently-played"]
@@ -66,11 +68,10 @@ def test_spotify_callback_persists_connection(
     authorization_response = client.get(
         f"{settings.API_V1_STR}/spotify/authorize",
         headers=normal_user_token_headers,
-        follow_redirects=False,
     )
-    state = parse_qs(urlparse(authorization_response.headers["location"]).query)[
-        "state"
-    ][0]
+    assert authorization_response.status_code == 200
+    auth_url = authorization_response.json()["authorization_url"]
+    state = parse_qs(urlparse(auth_url).query)["state"][0]
     monkeypatch.setattr(spotify_oauth, "exchange_code", mocked_exchange_code)
     monkeypatch.setattr(
         spotify_oauth, "fetch_current_user", mocked_fetch_current_user
@@ -113,11 +114,10 @@ def test_spotify_callback_rejects_duplicate_account(
     authorization_response = client.get(
         f"{settings.API_V1_STR}/spotify/authorize",
         headers=normal_user_token_headers,
-        follow_redirects=False,
     )
-    state = parse_qs(urlparse(authorization_response.headers["location"]).query)[
-        "state"
-    ][0]
+    assert authorization_response.status_code == 200
+    auth_url = authorization_response.json()["authorization_url"]
+    state = parse_qs(urlparse(auth_url).query)["state"][0]
     monkeypatch.setattr(spotify_oauth, "exchange_code", mocked_exchange_code)
     monkeypatch.setattr(
         spotify_oauth, "fetch_current_user", mocked_fetch_current_user

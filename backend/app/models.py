@@ -88,6 +88,11 @@ class SpotifyConnectionStatus(SQLModel):
     last_sync: datetime | None = None
 
 
+class SpotifyAuthorizeUrl(SQLModel):
+    success: bool
+    authorization_url: str
+
+
 # Shared properties
 class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
